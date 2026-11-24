@@ -9,7 +9,7 @@
   const model=window.appModel;
   const button=document.getElementById('syncButton');
   const KEY='finca-a-la-vista-v1';
-  const seed={id:'suesca-guita',name:'Casa campestre · Vereda Güita',location:'Suesca, Cundinamarca · Vereda Güita',url:'https://www.fincaraiz.com.co/casa-campestre-en-venta-en-suesca-cundinamarca/194205033',asking:450000000,offer:360000000,targetLow:375000000,targetHigh:390000000,maxPrice:400000000,contingency:15,age:'Ficha: rango 16–30 años; confirmar',summary:'Venta anunciada “a puerta cerrada” · confirmar precio sin mobiliario',checks:{},ratings:{},repairs:{},photos:{}};
+  const seeds=model.getSeedProfiles();
   const photoCache=new Map();
   const propertyCache=new Map();
   let auth=null,store=null,activeUid=null,unsubscribe=null,timer=null,busy=false,lastError='';
@@ -21,11 +21,15 @@
   function hasLocalChanges(data){
     if(Number(data?.updatedAt)>0)return true;
     const props=data?.properties||[];
-    if(props.length!==1||data.active!==seed.id)return true;
-    const p=props[0];
-    if(p.id!==seed.id)return true;
-    for(const [k,v] of Object.entries(seed))if(serialized(p[k])!==serialized(v))return true;
-    return Object.entries(p).some(([k,v])=>!(k in seed)&&!(v===''||v==null||(typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===0)));
+    const meaningful=v=>!(v===''||v==null||(typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===0));
+    if(data?.active&&!seeds.some(s=>s.id===data.active))return true;
+    for(const seed of seeds){
+      const p=props.find(x=>x.id===seed.id);
+      if(!p)return true;
+      for(const [k,v] of Object.entries(seed))if(serialized(p[k])!==serialized(v))return true;
+      if(Object.entries(p).some(([k,v])=>!(k in seed)&&meaningful(v)))return true;
+    }
+    return props.some(p=>!seeds.some(s=>s.id===p.id));
   }
   function propertyWithoutPhotos(p){const x={...p};delete x.photos;return x}
   function applyDb(data){window.__syncApplying=true;try{model.setDb(data);setLocal(data)}finally{window.__syncApplying=false}}
@@ -104,7 +108,13 @@
       let synced=true;
       if(remote&&remote.properties.length){
         if(localHasChanges&&!Number(local.updatedAt)){local.updatedAt=Date.now();applyDb(local);synced=await writeCloud()}
-        else if(Number(remote.updatedAt)>=Number(local.updatedAt||0)){applyDb(remote)}
+        else if(Number(remote.updatedAt)>=Number(local.updatedAt||0)){
+          const missing=seeds.filter(seed=>!remote.properties.some(p=>p.id===seed.id));
+          for(const seed of missing)remote.properties.push(JSON.parse(JSON.stringify(seed)));
+          if(missing.length)remote.updatedAt=Math.max(Date.now(),Number(remote.updatedAt||0)+1);
+          applyDb(remote);
+          if(missing.length)synced=await writeCloud();
+        }
         else synced=await writeCloud();
       }else if(localHasChanges){if(!Number(local.updatedAt)){local.updatedAt=Date.now();applyDb(local)}synced=await writeCloud()}
       else{synced=false;status('Google conectado · aún no hay cambios locales para subir. Conecta primero el dispositivo que ya tiene la ficha.');}
