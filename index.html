@@ -55,3 +55,101 @@ function update(){renderProfile();document.getElementById('heroPrice').textConte
 document.getElementById('propertySelect').onchange=e=>{db.active=e.target.value;load();persist()};document.getElementById('duplicate').onclick=()=>{let name=prompt('Nombre para la nueva propiedad','Nueva propiedad');if(!name)return;let p=JSON.parse(JSON.stringify(base));p.id='prop-'+Date.now();p.name=name;p.location='';p.url='';p.asking='';p.offer='';p.targetLow='';p.targetHigh='';p.maxPrice='';p.checks={};p.ratings={};p.repairs={};p.photos={};db.properties.push(p);db.active=p.id;load();persist();toast('Nueva ficha creada')};document.getElementById('save').onclick=()=>{persist();toast('Ficha guardada')};document.getElementById('print').onclick=()=>window.print();document.getElementById('export').onclick=()=>download();document.getElementById('share').onclick=async()=>{let data=JSON.stringify(current,null,2);if(navigator.share){try{await navigator.share({title:current.name,text:'Ficha de visita inmobiliaria',files:[new File([data],slug(current.name)+'.json',{type:'application/json'})]})}catch(e){download()}}else download()};document.getElementById('import').onclick=()=>document.getElementById('importFile').click();document.getElementById('importFile').onchange=e=>{const file=e.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const p=JSON.parse(reader.result);if(!p||typeof p!=='object'||!p.name)throw new Error('Ficha inválida');p.id=p.id||'prop-import-'+Date.now();p.checks=p.checks||{};p.ratings=p.ratings||{};p.repairs=p.repairs||{};p.photos=p.photos||{};const idx=db.properties.findIndex(x=>x.id===p.id);if(idx>=0)db.properties[idx]=p;else db.properties.push(p);db.active=p.id;load();persist();toast('Ficha importada en este dispositivo')}catch(err){toast('No pude leer esa ficha JSON')}};reader.readAsText(file);e.target.value=''};function slug(s){return String(s||'ficha').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}function download(){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(current,null,2)],{type:'application/json'}));a.download=slug(current.name)+'-visita.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('Copia JSON descargada')}load();window.appModel={getDb:()=>db,setDb:value=>{db=value;load()},getSeedProfiles:()=>JSON.parse(JSON.stringify([base,chocontaBase])),save:()=>persist(),setSyncStatus:message=>{document.getElementById('syncStatus').textContent=message},setSyncButton:label=>{document.getElementById('syncButton').textContent=label}};
 </script><script src="sync.js"></script><script>(()=>{const photos=document.getElementById('photos');if(!photos)return;const css='.photo img{cursor:zoom-in}.photo img:focus-visible{outline:3px solid #1d5b4b;outline-offset:3px}.photo-viewer{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:24px;background:rgba(7,17,15,.91)}.photo-viewer.hide{display:none!important}.photo-viewer img{display:block;max-width:94vw;max-height:88vh;object-fit:contain;border-radius:12px;box-shadow:0 12px 48px #0008}.photo-viewer-close{position:fixed;top:14px;right:14px;width:46px;height:46px;border:1px solid #ffffff66;border-radius:50%;background:#183c35;color:#fff;font-size:28px}.photo-viewer-hint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);color:#fff;background:#0009;padding:6px 11px;border-radius:20px;font-size:13px}@media(max-width:720px){.photo-viewer{padding:12px}.photo-viewer img{max-width:96vw;max-height:84vh}.photo-viewer-close{top:10px;right:10px;width:42px;height:42px}}';const style=document.createElement('style');style.textContent=css;document.head.appendChild(style);const viewer=document.createElement('div');viewer.className='photo-viewer hide';viewer.setAttribute('role','dialog');viewer.setAttribute('aria-modal','true');viewer.setAttribute('aria-label','Foto ampliada');viewer.innerHTML='<button type="button" class="photo-viewer-close" aria-label="Cerrar foto ampliada">×</button><img alt=""><span class="photo-viewer-hint">Toca fuera de la foto o × para cerrar</span>';document.body.appendChild(viewer);const large=viewer.querySelector('img'),closeButton=viewer.querySelector('button');let source=null,overflow='';const close=()=>{viewer.classList.add('hide');large.removeAttribute('src');document.body.style.overflow=overflow;if(source&&source.isConnected)source.focus()};const open=img=>{source=img;overflow=document.body.style.overflow;large.src=img.currentSrc||img.src;large.alt=img.alt||'Foto de la propiedad';viewer.classList.remove('hide');document.body.style.overflow='hidden';closeButton.focus()};const enhance=()=>photos.querySelectorAll('img').forEach(img=>{img.tabIndex=0;img.setAttribute('role','button');img.setAttribute('aria-label','Ampliar foto: '+(img.alt||'foto de la propiedad'))});enhance();new MutationObserver(enhance).observe(photos,{childList:true,subtree:true});photos.addEventListener('click',e=>{const img=e.target.closest('img');if(!img)return;e.preventDefault();e.stopPropagation();open(img)},true);photos.addEventListener('keydown',e=>{const img=e.target.closest('img');if(!img||!['Enter',' '].includes(e.key))return;e.preventDefault();e.stopPropagation();open(img)},true);closeButton.addEventListener('click',close);viewer.addEventListener('click',e=>{if(e.target===viewer)close()});document.addEventListener('keydown',e=>{if(!viewer.classList.contains('hide')&&e.key==='Escape')close()})})();</script></body></html>
 
+<script>
+/* Evaluación por pareja para Finca a la vista. Hechos compartidos; opiniones individuales. */
+(()=>{
+  if(!window.appModel||window.__dualEvaluationLoaded)return;
+  window.__dualEvaluationLoaded=true;
+  const model=window.appModel, esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const personName=p=>(p==='a'?(current.reviewerA||'Yo'):(current.reviewerB||'Mi esposa'));
+  const personal=[
+    ['#datos','impression','Primera impresión','¿Qué te gustó? ¿Qué te hizo dudar?'],
+    ['#interior','layoutNotes','Distribución y comodidad','¿Qué funciona para ti? ¿Qué cambiarías?'],
+    ['#interior','safetyNotes','Entorno y seguridad','¿Cómo percibes el entorno y la seguridad?']
+  ];
+  const setup=document.querySelector('#datos .grid3');
+  setup.insertAdjacentHTML('afterend','<div id="reviewerSetup" class="reviewer-setup"><strong>Evaluación por separado</strong><p>Los hechos se registran una sola vez. Cada uno marca sus propias percepciones y puntuaciones.</p><div class="grid2"><div class="field"><label>Evaluador 1</label><input data-k="reviewerA" placeholder="Yo"></div><div class="field"><label>Evaluador 2</label><input data-k="reviewerB" placeholder="Mi esposa"></div></div><div id="factSummary" class="refnote"></div></div>');
+  for(const [section,key,title,placeholder] of personal){
+    const old=document.querySelector(section+' [data-k="'+key+'"]');
+    if(!old)continue;
+    const box=old.closest('.field');
+    box.querySelector('label').textContent='Notas compartidas / acuerdos';
+    box.insertAdjacentHTML('afterend','<div class="grid2 personal-notes" style="margin-top:8px"><div class="field"><label>'+title+' · <span data-person-name="a">Yo</span></label><textarea data-k="'+key+'A" placeholder="'+placeholder+'"></textarea></div><div class="field"><label>'+title+' · <span data-person-name="b">Mi esposa</span></label><textarea data-k="'+key+'B" placeholder="'+placeholder+'"></textarea></div></div>');
+  }
+  const decisions=document.querySelector('#decision .decision');
+  decisions.insertAdjacentHTML('afterend','<div class="reviewer-decisions"><div class="checklist-title">Decisión personal inicial</div><div class="grid2"><div class="field"><label><span data-person-name="a">Yo</span>: ¿seguiría con esta opción?</label><select data-person-decision="a"><option value="">Sin responder</option><option>Sí</option><option>Con dudas</option><option>No</option></select></div><div class="field"><label><span data-person-name="b">Mi esposa</span>: ¿seguiría con esta opción?</label><select data-person-decision="b"><option value="">Sin responder</option><option>Sí</option><option>Con dudas</option><option>No</option></select></div></div></div>');
+  const style=document.createElement('style');
+  style.textContent='.reviewer-setup{background:#f2f6ef;border:1px solid #dce6d8;border-radius:14px;padding:14px;margin:14px 0}.reviewer-setup>p{color:#64756e;margin:5px 0 12px}.fact-check{display:grid;grid-template-columns:minmax(0,1fr) minmax(165px,220px);gap:10px;align-items:center;border-bottom:1px solid #e7ebe4;padding:7px 2px}.fact-check:last-child,.opinion-row:last-child{border-bottom:0}.fact-check select,.opinion-choice select,.reviewer-decisions select{width:100%;min-height:40px;border:1px solid #dce2d9;border-radius:10px;background:#fff;padding:7px}.fact-check select[data-state="issue"]{border-color:#d89b70;background:#fff6ef}.fact-check select[data-state="ok"]{border-color:#9abd9e;background:#f3faf2}.opinion-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(270px,1fr);gap:10px;align-items:center;border-bottom:1px solid #e7ebe4;padding:9px 2px}.opinion-text{font-weight:600}.opinion-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}.opinion-choice{font-size:12px;color:#64756e}.opinion-choice small{display:block;font-weight:700;margin:0 0 3px}.personal-notes,.reviewer-decisions{margin-bottom:8px}.rating-pair{display:grid;grid-template-columns:1fr 1fr;gap:7px}.rating-input{width:100%;min-width:54px}.score-persons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.score-person{background:#f5f7f2;border-radius:10px;padding:9px;font-size:13px}.score-person b{font-size:18px;display:block}.score-differences{margin-top:8px}.table th{vertical-align:bottom}@media(max-width:620px){.fact-check{grid-template-columns:1fr}.opinion-row{grid-template-columns:1fr}.opinion-pair{grid-template-columns:1fr 1fr}.rating-pair{min-width:120px}.reviewer-setup{padding:11px}}';
+  document.head.appendChild(style);
+  const oldBind=bindInputs,oldTables=renderTables,oldUpdate=update,oldLoad=load;
+  function drawChecks(){
+    current.reviewerA=current.reviewerA||'Yo';current.reviewerB=current.reviewerB||'Mi esposa';
+    let changed=false;
+    document.querySelectorAll('[data-checks]').forEach(group=>{
+      const parts=group.dataset.checks.split('|'),category=parts.shift(),subjective=['Primera impresión','Distribución','Entorno y seguridad'].includes(category);
+      group.classList.add(subjective?'opinion-checks':'fact-checks');
+      group.innerHTML=parts.map((label,i)=>{
+        const id=category+'_'+i;
+        if(subjective){
+          current.opinionChecks=current.opinionChecks||{a:{},b:{}};
+          current.opinionChecks.a=current.opinionChecks.a||{};current.opinionChecks.b=current.opinionChecks.b||{};
+          if(current.opinionChecks.a[id]===undefined&&current.checks?.[id]===true){current.opinionChecks.a[id]='good';changed=true}
+          return '<div class="opinion-row"><span class="opinion-text">'+esc(label)+'</span><div class="opinion-pair">'+['a','b'].map(person=>'<label class="opinion-choice"><small data-person-name="'+person+'">'+esc(personName(person))+'</small><select data-opinion="'+esc(id)+'" data-person="'+person+'" aria-label="'+esc(personName(person)+': '+label)+'"><option value="">Sin responder</option><option value="good">Me parece bien</option><option value="concern">Me preocupa</option><option value="na">No aplica</option></select></label>').join('')+'</div></div>';
+        }
+        current.factChecks=current.factChecks||{};
+        let value=current.factChecks[id];
+        if(value===undefined){const legacy=current.checks?.[id];value=['pending','ok','issue','na'].includes(legacy)?legacy:(legacy===true?'ok':'pending');current.factChecks[id]=value;changed=true}
+        return '<label class="fact-check"><span>'+esc(label)+'</span><select data-fact="'+esc(id)+'" data-state="'+esc(value)+'" aria-label="'+esc(label)+'"><option value="pending">Pendiente</option><option value="ok">Verificado / conforme</option><option value="issue">Hallazgo</option><option value="na">No aplica</option></select></label>';
+      }).join('');
+      group.querySelectorAll('[data-fact]').forEach(el=>{el.value=current.factChecks[el.dataset.fact];el.onchange=()=>{current.factChecks[el.dataset.fact]=el.value;el.dataset.state=el.value;update();persist()}});
+      group.querySelectorAll('[data-opinion]').forEach(el=>{
+        const person=el.dataset.person,id=el.dataset.opinion;el.value=current.opinionChecks?.[person]?.[id]||'';
+        el.onchange=()=>{current.opinionChecks=current.opinionChecks||{a:{},b:{}};current.opinionChecks[person]=current.opinionChecks[person]||{};current.opinionChecks[person][id]=el.value;persist()};
+      });
+    });
+    document.querySelectorAll('[data-person-decision]').forEach(el=>{el.value=current.personalDecision?.[el.dataset.personDecision]||'';el.onchange=()=>{current.personalDecision=current.personalDecision||{};current.personalDecision[el.dataset.personDecision]=el.value;persist()}});
+    if(changed)persist();
+  }
+  function ratingValue(person,i){const v=current.ratingsByPerson?.[person]?.[i];if(v!==undefined&&v!=='')return Number(v)||'';if(person==='a')return Number(current.ratings?.[i])||'';return ''}
+  function drawRatings(){
+    const body=document.getElementById('ratings'),head=body?.closest('table')?.querySelector('thead tr');if(!body||!head)return;
+    current.ratingsByPerson=current.ratingsByPerson||{a:{},b:{}};
+    current.ratingsByPerson.a=current.ratingsByPerson.a||{};current.ratingsByPerson.b=current.ratingsByPerson.b||{};
+    head.innerHTML='<th>Factor y peso</th><th data-rating-heading="a">'+esc(personName('a'))+' · /10</th><th data-rating-heading="b">'+esc(personName('b'))+' · /10</th>';
+    body.innerHTML=ratingNames.map((name,i)=>'<tr><td>'+esc(name)+'<small class="weight">Peso '+ratingWeights[i]+'%</small></td><td colspan="2"><div class="rating-pair">'+['a','b'].map(person=>'<input class="rating-input" type="number" min="1" max="10" placeholder="—" data-rating="'+i+'" data-rating-person="'+person+'" aria-label="'+esc(personName(person)+' puntaje de '+name)+'">').join('')+'</div></td></tr>').join('');
+    body.querySelectorAll('[data-rating-person]').forEach(el=>{
+      el.value=ratingValue(el.dataset.ratingPerson,el.dataset.rating);
+      el.oninput=()=>{const person=el.dataset.ratingPerson,i=el.dataset.rating;current.ratingsByPerson=current.ratingsByPerson||{a:{},b:{}};const value=el.value?Math.min(10,Math.max(1,Number(el.value))):'';current.ratingsByPerson[person]=current.ratingsByPerson[person]||{};current.ratingsByPerson[person][i]=value;if(person==='a'){current.ratings=current.ratings||{};current.ratings[i]=value}update();persist()};
+    });
+  }
+  function dualSummary(){
+    document.querySelectorAll('[data-person-name]').forEach(el=>el.textContent=personName(el.dataset.personName));
+    document.querySelectorAll('[data-rating-heading]').forEach(el=>el.textContent=personName(el.dataset.ratingHeading)+' · /10');
+    const sums={a:{sum:0,weight:0},b:{sum:0,weight:0}},joint={sum:0,weight:0},diff=[];
+    ratingNames.forEach((name,i)=>{
+      const a=ratingValue('a',i),b=ratingValue('b',i),w=ratingWeights[i];
+      if(a){sums.a.sum+=a*w;sums.a.weight+=w}if(b){sums.b.sum+=b*w;sums.b.weight+=w}
+      if(a&&b){joint.sum+=((a+b)/2)*w;joint.weight+=w;if(Math.abs(a-b)>=3)diff.push(name+' ('+personName('a')+' '+a+' / '+personName('b')+' '+b+')')}
+    });
+    const avg=x=>x.weight?(x.sum/x.weight).toFixed(1).replace('.',','):'—';
+    document.getElementById('score').textContent=avg(joint);document.getElementById('scoreBar').style.width=(joint.weight?(joint.sum/joint.weight)*10:0)+'%';
+    document.getElementById('scoreLabel').textContent=joint.weight===100?'Ambos calificaron todo':joint.weight?'Promedio parcial':'Faltan notas de ambos';
+    const note=document.getElementById('scoreNote');note.innerHTML='';
+    const persons=document.createElement('div');persons.className='score-persons';
+    ['a','b'].forEach(p=>{const box=document.createElement('div');box.className='score-person';const name=document.createElement('span');name.textContent=personName(p)+' · cobertura '+sums[p].weight+'%';const score=document.createElement('b');score.textContent=avg(sums[p])+' / 10';box.append(name,score);persons.append(box)});
+    const coverage=document.createElement('div');coverage.className='refnote';coverage.textContent='Puntaje conjunto: solo factores calificados por ambos · cobertura compartida '+joint.weight+'% de los pesos.';
+    const differences=document.createElement('div');differences.className='score-differences';differences.textContent=diff.length?'Diferencias de 3 o más puntos para conversar: '+diff.join('; '):'No hay diferencias de 3 o más puntos en factores con doble calificación.';
+    note.append(persons,coverage,differences);
+    const counts={ok:0,issue:0,pending:0,na:0};document.querySelectorAll('[data-fact]').forEach(el=>{if(el.value in counts)counts[el.value]++});
+    const summary=document.getElementById('factSummary');if(summary)summary.textContent='Hechos compartidos · '+counts.ok+' verificados · '+counts.issue+' hallazgos · '+counts.pending+' pendientes · '+counts.na+' no aplican.';
+  }
+  window.bindInputs=function(){oldBind();drawChecks()};
+  window.renderTables=function(){oldTables();drawRatings()};
+  window.update=function(){oldUpdate();dualSummary()};
+  window.load=function(){oldLoad();drawChecks();drawRatings();dualSummary()};
+  document.querySelectorAll('[data-k="reviewerA"]').forEach(el=>el.value=current.reviewerA||'Yo');
+  document.querySelectorAll('[data-k="reviewerB"]').forEach(el=>el.value=current.reviewerB||'Mi esposa');
+  oldBind();
+  drawChecks();drawRatings();dualSummary();
+})();
+</script>
