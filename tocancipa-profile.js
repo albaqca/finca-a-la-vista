@@ -99,3 +99,6 @@
   }
   model.save();
 })();
+
+// Permite ampliar la galería que se inserta al elegir esta propiedad.
+(()=>{const selector='#listingGalleryTocancipa';const enhance=()=>document.querySelectorAll(selector+' img').forEach(img=>{img.tabIndex=0;img.setAttribute('role','button');img.setAttribute('aria-label','Ampliar foto: '+(img.alt||'foto de la propiedad'))});enhance();new MutationObserver(enhance).observe(document.body,{childList:true,subtree:true});const show=e=>{const img=e.target instanceof Element?e.target.closest(selector+' img'):null;if(!img)return;const viewer=document.querySelector('.photo-viewer'),large=viewer?.querySelector('img');if(!large)return;e.preventDefault();e.stopImmediatePropagation();large.src=img.currentSrc||img.src;large.alt=img.alt||'Foto de la propiedad';viewer.classList.remove('hide');document.body.style.overflow='hidden'};document.addEventListener('click',show,true);document.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key))show(e)},true)})();
