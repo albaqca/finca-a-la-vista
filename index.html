@@ -1,4 +1,4 @@
-document.addEventListener('click',e=>{if(photoRoots.some(root=>root.id==='listingGalleryTocancipa'))return;const img=e.target.closest('#listingGalleryTocancipa img');if(!img)return;e.preventDefault();e.stopPropagation();open(img)},true);document.addEventListener('keydown',e=>{if(photoRoots.some(root=>root.id==='listingGalleryTocancipa'))return;const img=e.target.closest('#listingGalleryTocancipa img');if(!img||!['Enter',' ' ].includes(e.key))return;e.preventDefault();e.stopPropagation();open(img)},true);closeButton.addEventListener('click',close);<!doctype html>
+<!doctype html>
 <html lang="es">
 <!-- deployment retry: dual-review 2026-11-25 -->
 <head>
